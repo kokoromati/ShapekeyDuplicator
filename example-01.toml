@@ -1,0 +1,73 @@
+# ShapekeyDuplicator アドオン用 toml ファイル例 01
+
+# 下記のような感じで複製元を from、複製先を to に指定する。
+# 複製先は上書きされるので注意。
+# この行はコメント行で、動作に影響しない。
+[[duplicate]]
+from = "test-a"
+to = "テストａ"
+
+[[duplicate]]
+from = "test-i"
+to = "テストｉ"
+
+[[duplicate]]
+from = "test-u"
+to = "テストｕ"
+
+[[duplicate]]
+from = "test-e"
+to = "テストｅ"
+
+[[duplicate]]
+from = "test-o"
+to = "テストｏ"
+
+[[duplicate]]
+from = "test-n"
+to = "テストｎ"
+
+# `ベース` シェイプキーを複製して一覧で見やすいようにセパレータとする。
+# 下記のように定義することで to を複数指定できる。
+[[duplicate]]
+from = "ベース"
+to = ["--VRC--", "--English--", "--Japanese--", "--Other--"]
+
+# 下記のような感じでソート順を定義する。
+# 先頭に存在するシェイプキー（`ベース` や `Basis`）はソートの対象外であり、定義の必要はない。
+# ここに定義のないシェイプキーは一番後ろに並ぶ。
+[sort]
+order = [
+    "--VRC--",
+    "vrc.blink",
+    "vrc.v_sil",
+    "vrc.v_aa",
+    "vrc.v_ih",
+    "vrc.v_th",
+    "vrc.v_kk",
+    "vrc.v_ff",
+    "vrc.v_rr",
+    "vrc.v_e",
+    "vrc.v_dd",
+    "vrc.v_ss",
+    "vrc.v_ch",
+    "vrc.v_ou",
+    "vrc.v_oh",
+    "vrc.v_pp",
+    "vrc.v_nn",
+    "--English--",
+    "test-a",
+    "test-i",
+    "test-u",
+    "test-e",
+    "test-o",
+    "test-n",
+    "--Japanese--",
+    "テストａ",
+    "テストｉ",
+    "テストｕ",
+    "テストｅ",
+    "テストｏ",
+    "テストｎ",
+    "--Other--"
+]
