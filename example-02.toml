@@ -1,0 +1,87 @@
+# ShapekeyDuplicator アドオン用 toml ファイル例 02
+
+# [[duplicate]] と [[sort]] には allow_object_name と deny_object_name が指定でき、
+# 複製やソートの対象とするオブジェクト名を指定できます。
+# これにより、１つの toml ファイルで複数種類のオブジェクトの定義に対応しやすくなり、
+# また「頭以外のオブジェクトには適用したくなかったのにしてしまった」などの事故も防げます。
+
+# 具体例から記述しますと、下記のようにすればオブジェクト名の先頭が "head" のもののみが
+# 複製の対象となります。ワイルドカードが使用可能です。
+[[duplicate]]
+from = "mouth_a"
+to = "あ"
+allow_object_name = "head*"
+
+# 下記のようにワイルドカードを使わずオブジェクト名を直接指定することもできます。
+# オブジェクト名が "head", "head.ear", "head.hair" の場合にのみ複製の対象となります。
+[[duplicate]]
+from = "mouth_i"
+to = "い"
+allow_object_name = ["head", "head.ear", "head.hair"]
+
+# 以下は少し詳しい説明です。
+# 
+# allow_object_name と deny_object_name は定義しなくてもよく、その場合は
+# デフォルト値として allow_object_name には "*"、deny_object_name には "" が入ります。
+# デフォルト値の場合、まず deny_object_name には定義が無く（空文字）、拒否されません。
+# 次に allow_object_name には全てを表すワイルドカード "*" が定義されており、全ての
+# オブジェクト名が許可されます。よって、このデフォルト値の場合はどんなオブジェクト名でも
+# 複製対象となります。
+[[duplicate]]
+from = "mouth_u"
+to = "う"
+allow_object_name = "*"
+deny_object_name = ""
+
+# 下記のように deny_object_name を定義すると、"body" や "body_tail" などのオブジェクト名が
+# 拒否されて複製対象にならなくなります。それ以外は全許可されているので、"body" 先頭以外の
+# オブジェクトは複製対象になります。
+[[duplicate]]
+from = "mouth_e"
+to = "え"
+allow_object_name = "*"
+deny_object_name = "body*"
+
+# 下記のようにどちらも未定義とすると、拒否も許可もされず、暗黙的に拒否されて、常に複製されません。
+[[duplicate]]
+from = "mouth_o"
+to = "お"
+allow_object_name = ""
+deny_object_name = ""
+
+# ワイルドカードは下記の記述が使用できます。
+# `*` : すべてにマッチします
+# `?` : 任意の一文字にマッチします
+# `[seq]` : seq にある任意の文字にマッチします
+# `[!seq]` : seq にない任意の文字にマッチします
+[[duplicate]]
+from = "ベース"
+to = ["--Standard--", "--MMD--", "--Other--"]
+allow_object_name = ["head", "head.???"]
+
+# ソートは通常１つの定義だけでいいのですが、下記のように複数定義して頭はこの定義、体はこの定義と
+# いったことが出来ます。
+[[sort]]
+order = [
+    "--Standard--",
+    "mouth_a",
+    "mouth_i",
+    "mouth_u",
+    "mouth_e",
+    "mouth_o",
+    "--MMD--",
+    "あ",
+    "い",
+    "う",
+    "え",
+    "お",
+    "--Other--"
+]
+allow_object_name = "head*"
+
+[[sort]]
+order = [
+    "tail_up",
+    "tail_down"
+]
+allow_object_name = "body*"

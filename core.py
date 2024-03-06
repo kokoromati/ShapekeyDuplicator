@@ -1,5 +1,6 @@
 import bpy
 import os
+import fnmatch
 import traceback
 from dataclasses import dataclass
 from bpy_extras.io_utils import ImportHelper
@@ -69,23 +70,43 @@ class SHAPEKEYDUPLICATOR_OT_duplicate_and_sort(bpy.types.Operator):
                     raise Exception("[[duplicate]] 以下の to に文字列ではない値が入っています。")
                 if len(sk_name_to) == 0:
                     raise Exception("[[duplicate]] 以下の to が空です。")
-        order_list = toml_data.get("sort", {}).get("order", [])
-        if not isinstance(order_list, list):
-            raise Exception("[sort] 以下の order に配列ではない値が入っています。")
-        count_dict = {}
-        for sk_name in order_list:
-            if not isinstance(sk_name, str):
-                raise Exception("[sort] 以下の order 配列に文字列ではない値が入っています。")
-            if len(sk_name) == 0:
-                raise Exception("[sort] 以下の order 配列に空文字が入っています。")
-            if sk_name in count_dict:
-                count_dict[sk_name] += 1
-            else:
-                count_dict[sk_name] = 1
-        duplicate_list = [key for key, value in count_dict.items() if value > 1]
-        if len(duplicate_list) > 0:
-            raise Exception(f"[sort] 以下の order 配列内で重複があります。{duplicate_list}")
+            self._process_allow_and_deny(duplicate, "[[duplicate]]", "allow_object_name", "*")
+            self._process_allow_and_deny(duplicate, "[[duplicate]]", "deny_object_name", "")
+        for sort in toml_data.get("sort", []):
+            order_list = sort.get("order", [])
+            if not isinstance(order_list, list):
+                raise Exception("[[sort]] 以下の order に配列ではない値が入っています。")
+            count_dict = {}
+            for sk_name in order_list:
+                if not isinstance(sk_name, str):
+                    raise Exception("[[sort]] 以下の order 配列に文字列ではない値が入っています。")
+                if len(sk_name) == 0:
+                    raise Exception("[[sort]] 以下の order 配列に空文字が入っています。")
+                if sk_name in count_dict:
+                    count_dict[sk_name] += 1
+                else:
+                    count_dict[sk_name] = 1
+            duplicate_list = [key for key, value in count_dict.items() if value > 1]
+            if len(duplicate_list) > 0:
+                raise Exception(f"[[sort]] 以下の order 配列内で重複があります。{duplicate_list}")
+            self._process_allow_and_deny(sort, "[[sort]]", "allow_object_name", "*")
+            self._process_allow_and_deny(sort, "[[sort]]", "deny_object_name", "")
         return toml_data        
+
+    def _process_allow_and_deny(self, dict, parent_name, define_name, default_value):
+        # デフォルト値
+        if define_name not in dict:
+            dict[define_name] = default_value
+        # 配列可、配列に統一
+        if isinstance(dict[define_name], str):
+            dict[define_name] = [dict[define_name]]
+        elif isinstance(dict[define_name], list):
+            pass
+        else:
+            raise Exception(f"{parent_name} 以下の {define_name} 直下に文字列または配列ではない値が入っています。")
+        for s in dict[define_name]:
+            if not isinstance(s, str):
+                raise Exception(f"{parent_name} 以下の to に文字列ではない値が入っています。")
 
     # 複製・ソートの実行
     def _duplicate_and_sort(self, context, toml_data, object_list):
@@ -102,16 +123,42 @@ class SHAPEKEYDUPLICATOR_OT_duplicate_and_sort(bpy.types.Operator):
             context.view_layer.objects.active = object
             # 複製
             for duplicate in toml_data.get("duplicate", []):
+                # 許可されたオブジェクト名のみ通す
+                if not self._is_allowed(duplicate, object.name):
+                    continue
+                # 処理実行
                 sk_name_from = duplicate["from"]
                 for sk_name_to in duplicate["to"]:
                     self._duplicate_shape_key(object, sk_name_from, sk_name_to)
-                    print(f"duplicate {sk_name_from} => {sk_name_to}")
             # ソート
-            self._sort_shape_key(object, toml_data.get("sort", {}).get("order", []))
+            for sort in toml_data.get("sort", []):
+                # 許可されたオブジェクト名のみ通す
+                if not self._is_allowed(sort, object.name):
+                    continue
+                # 処理実行
+                self._sort_shape_key(object, sort.get("order", []))
+        # 処理結果
         return f"Done! : 複製 {self._duplicate_cnt} " + \
                 f"(上書き {self._overwrite_cnt}), " + \
                 f"シェイプキーが存在せず複製スキップ {self._duplicate_skip_cnt}, " + \
                 f"ソート {self._sort_cnt}"
+
+    # allow_object_name, deny_object_name 定義でこのオブジェクト名が許可されているかどうか
+    def _is_allowed(self, define_dict, object_name):
+        # deny_object_name にヒットすれば拒否。allow_object_name より優先
+        for deny_pat in define_dict["deny_object_name"]:
+            if deny_pat == "":
+                continue
+            if fnmatch.fnmatch(object_name, deny_pat):
+                return False
+        # allow_object_name にヒットすれば許可
+        for allow_pat in define_dict["allow_object_name"]:
+            if allow_pat == "":
+                continue
+            if fnmatch.fnmatch(object_name, allow_pat):
+                return True
+        # 暗黙の拒否
+        return False
 
     # シェイプキーの複製
     def _duplicate_shape_key(self, object, sk_name_from, sk_name_to):
@@ -146,7 +193,6 @@ class SHAPEKEYDUPLICATOR_OT_duplicate_and_sort(bpy.types.Operator):
         old_sk_list = []
         for index, shape_key in enumerate(shape_keys.key_blocks):
             old_sk_list.append(SK(index, shape_key.name))
-            print(f"old_sk_list : {index}, {shape_key.name}")
         new_sk_list = []
         new_sk_index = 0
         # 現在の先頭のシェイプキーはソート時も先頭を保つ
@@ -174,7 +220,6 @@ class SHAPEKEYDUPLICATOR_OT_duplicate_and_sort(bpy.types.Operator):
             shape_key_index = shape_keys.key_blocks.find(sk.name)
             object.active_shape_key_index = shape_key_index
             bpy.ops.object.shape_key_move(type="BOTTOM")
-            print(f"sort : {sk.name}, {shape_key_index} => {sk.index}")
         object.active_shape_key_index = shape_keys.key_blocks.find(current_sk_name)
         self._sort_cnt += 1
 
@@ -187,7 +232,6 @@ class SHAPEKEYDUPLICATOR_OT_toml_selector(bpy.types.Operator, ImportHelper):
     filepath: bpy.props.StringProperty(subtype="FILE_PATH")   # type: ignore
 
     def execute(self, context):
-        print("Selected File:", self.filepath)
         context.scene.toml_path = self.filepath
         return {'FINISHED'}
 
